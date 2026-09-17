@@ -332,6 +332,9 @@
 </div>
 
 <script>
+// Anthropic model used for scoring. Update here if the API returns a
+// "model: ..." not_found error (that means the ID has been retired).
+const MODEL_ID = 'claude-sonnet-5';
 const WEIGHTS = [0.30, 0.25, 0.20, 0.15, 0.10];
 const SIG_NAMES = ['Substation', 'Transmission', 'Load pressure', 'Land use', 'Lead time'];
 const LEVELS = {
@@ -414,7 +417,7 @@ Return ONLY a raw JSON object with no markdown:
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_ID,
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -422,7 +425,15 @@ Return ONLY a raw JSON object with no markdown:
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `API error ${resp.status}`);
+    let msg = err.error?.message || `API error ${resp.status}`;
+    if (resp.status === 404 && /^model:/.test(msg)) {
+      msg = `Model "${MODEL_ID}" is not available on this API key (retired or no access). Update MODEL_ID in index.html.`;
+    } else if (resp.status === 401) {
+      msg = 'API key rejected — check the key above.';
+    } else if (resp.status === 429) {
+      msg = 'Rate limited by the API — wait a moment and retry.';
+    }
+    throw new Error(msg);
   }
 
   const data = await resp.json();
